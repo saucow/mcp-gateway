@@ -10,7 +10,6 @@ import (
 func Authorize(ctx context.Context, app string, scopes string) error {
 	client := desktop.NewAuthClient()
 
-	// Start OAuth flow - Docker Desktop handles DCR automatically if needed
 	authResponse, err := client.PostOAuthApp(ctx, app, scopes, false)
 	if err != nil {
 		return err

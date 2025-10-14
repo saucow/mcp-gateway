@@ -25,7 +25,7 @@ func (g *Gateway) startSseServer(ctx context.Context, ln net.Listener) error {
 	sseHandler := mcp.NewSSEHandler(func(_ *http.Request) *mcp.Server {
 		return g.mcpServer
 	}, nil)
-	mux.Handle("/sse", sseHandler)
+	mux.Handle("/sse", originSecurityHandler(sseHandler))
 	httpServer := &http.Server{
 		Handler: mux,
 	}
@@ -43,7 +43,7 @@ func (g *Gateway) startStreamingServer(ctx context.Context, ln net.Listener) err
 	streamHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server {
 		return g.mcpServer
 	}, nil)
-	mux.Handle("/mcp", streamHandler)
+	mux.Handle("/mcp", originSecurityHandler(streamHandler))
 	httpServer := &http.Server{
 		Handler: mux,
 	}
@@ -62,7 +62,7 @@ func (g *Gateway) startCentralStreamingServer(ctx context.Context, ln net.Listen
 
 	var lock sync.Mutex
 	handlersPerSelectionOfServers := map[string]*mcp.StreamableHTTPHandler{}
-	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/mcp", originSecurityHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		serverNames := r.Header.Get("x-mcp-servers")
 		if len(serverNames) == 0 {
 			log("No server names provided in the request header 'x-mcp-servers'")
@@ -88,7 +88,7 @@ func (g *Gateway) startCentralStreamingServer(ctx context.Context, ln net.Listen
 		lock.Unlock()
 
 		handler.ServeHTTP(w, r)
-	})
+	})))
 	httpServer := &http.Server{
 		Handler: mux,
 	}
@@ -128,4 +128,37 @@ func healthHandler(state *health.State) http.HandlerFunc {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 	}
+}
+
+// originSecurityHandler validates Origin header to prevent DNS rebinding attacks.
+// This implements the security requirement from the MCP specification:
+// https://modelcontextprotocol.io/specification/2024-11-05/basic/transports#security-warning
+func originSecurityHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+
+		// Allow requests with no Origin header
+		// This handles:
+		// - Non-browser clients (curl, SDKs) - no Origin header sent
+		// - Same-origin requests - browsers don't send Origin for same-origin
+		if origin != "" {
+			// For cross-origin requests (browser-based), only allow localhost origins
+			// This prevents DNS rebinding attacks using 0.0.0.0 or malicious domains
+			allowed := origin == "http://localhost" ||
+				origin == "https://localhost" ||
+				origin == "http://127.0.0.1" ||
+				origin == "https://127.0.0.1" ||
+				strings.HasPrefix(origin, "http://localhost:") ||
+				strings.HasPrefix(origin, "https://localhost:") ||
+				strings.HasPrefix(origin, "http://127.0.0.1:") ||
+				strings.HasPrefix(origin, "https://127.0.0.1:")
+
+			if !allowed {
+				http.Error(w, "Forbidden: Invalid Origin header", http.StatusForbidden)
+				return
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

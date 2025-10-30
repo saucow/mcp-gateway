@@ -60,9 +60,16 @@ func Set(ctx context.Context, s Secret, opts SetOpts) error {
 			return err
 		}
 	}
+
+	// Don't store plaintext value when using a provider
+	jfsValue := s.val
+	if opts.Provider != "" {
+		jfsValue = ""
+	}
+
 	return desktop.NewSecretsClient().SetJfsSecret(ctx, desktop.Secret{
 		Name:     s.key,
-		Value:    s.val,
+		Value:    jfsValue,
 		Provider: opts.Provider,
 	})
 }

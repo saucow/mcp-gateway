@@ -42,12 +42,13 @@ type NotificationMonitor struct {
 
 // NewNotificationMonitor creates a new notification monitor
 func NewNotificationMonitor() *NotificationMonitor {
-	// Create HTTP client that uses Docker Desktop's backend Unix socket
+	// Create HTTP client that uses Docker Desktop's backend socket.
+	// Uses desktop.DialBackend which handles platform-specific transport
+	// (named pipes on Windows via winio, Unix sockets on macOS/Linux).
 	client := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				dialer := net.Dialer{}
-				return dialer.DialContext(ctx, "unix", desktop.Paths().BackendSocket)
+				return desktop.DialBackend(ctx)
 			},
 		},
 	}

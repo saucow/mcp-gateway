@@ -6,11 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 var ErrSecretNotFound = errors.New("secret not found")
@@ -20,27 +16,6 @@ type Envelope struct {
 	Value    []byte            `json:"value"`
 	Provider string            `json:"provider"`
 	Metadata map[string]string `json:"metadata,omitempty"`
-}
-
-func socketPath() string {
-	if dir, err := os.UserCacheDir(); err == nil {
-		return filepath.Join(dir, "docker-secrets-engine", "engine.sock")
-	}
-	return filepath.Join(os.TempDir(), "docker-secrets-engine", "engine.sock")
-}
-
-// newHTTPClient creates a fresh HTTP client for each request.
-// This avoids connection state issues with Unix sockets that can cause hangs.
-func newHTTPClient() *http.Client {
-	return &http.Client{
-		Timeout: 10 * time.Second,
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				return (&net.Dialer{}).DialContext(ctx, "unix", socketPath())
-			},
-			DisableKeepAlives: true,
-		},
-	}
 }
 
 func GetSecrets(ctx context.Context) ([]Envelope, error) {

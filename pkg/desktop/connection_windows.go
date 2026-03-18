@@ -7,7 +7,8 @@ import (
 	"github.com/Microsoft/go-winio"
 )
 
-func dialBackend(ctx context.Context) (net.Conn, error) {
+// DialBackend dials the Docker Desktop backend socket using Windows named pipes.
+func DialBackend(ctx context.Context) (net.Conn, error) {
 	return dial(ctx, Paths().BackendSocket)
 }
 

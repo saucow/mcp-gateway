@@ -8,7 +8,8 @@ import (
 	"net"
 )
 
-func dialBackend(ctx context.Context) (net.Conn, error) {
+// DialBackend dials the Docker Desktop backend socket using Unix sockets.
+func DialBackend(ctx context.Context) (net.Conn, error) {
 	return dial(ctx, Paths().BackendSocket)
 }
 

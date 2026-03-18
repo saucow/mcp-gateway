@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-var ClientBackend = newRawClient(dialBackend)
+var ClientBackend = newRawClient(DialBackend)
 
 var (
 	desktopProxyTransportOnce sync.Once
